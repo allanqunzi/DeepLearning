@@ -31,7 +31,7 @@ function StockDataLoader.create(csv_dir, row_num, col_num)
 end
 
 -- exponential moving average
-function StockDataLoader.ema(period)
+function StockDataLoader:ema(period)
     local alpha = 2.0/(period + 1) -- decay percentage
     assert(self.row_num == self.data:size(1))
     local ema_data = torch.zeros(self.row_num)
@@ -43,7 +43,7 @@ function StockDataLoader.ema(period)
 end
 
 -- simple moving average with +/-2*sigma
-function StockDataLoader.sma(period)
+function StockDataLoader:sma(period)
     local data_size = self.col_num - period
     local sma_data = torch.Tensor(data_size, 3)
     local multiplier = 1.0/period

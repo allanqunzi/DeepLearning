@@ -3,11 +3,11 @@
 
 This file trains a character-level multi-layer RNN on text data
 
-Code is based on implementation in 
+Code is based on implementation in
 https://github.com/oxford-cs-ml-2015/practical6
 but modified to have multi-layer support, GPU support, as well as
 many other common model/optimization bells and whistles.
-The practical6 code is in turn based on 
+The practical6 code is in turn based on
 https://github.com/wojciechz/learning_to_execute
 which is turn based on other stuff in Torch, etc... (long lineage)
 
@@ -44,9 +44,9 @@ cmd:option('-learning_rate_decay',0.97,'learning rate decay')
 cmd:option('-learning_rate_decay_after',10,'in number of epochs, when to start decaying the learning rate')
 cmd:option('-decay_rate',0.95,'decay rate for rmsprop')
 cmd:option('-dropout',0,'dropout for regularization, used after each RNN hidden layer. 0 = no dropout')
-cmd:option('-seq_length',50,'number of timesteps to unroll for')
-cmd:option('-batch_size',50,'number of sequences to train on in parallel')
-cmd:option('-max_epochs',50,'number of full passes through the training data')
+cmd:option('-seq_length', 100,'number of timesteps to unroll for')
+cmd:option('-batch_size', 1,'number of sequences to train on in parallel')
+cmd:option('-max_epochs', 100,'number of full passes through the training data')
 cmd:option('-grad_clip',5,'clip gradients at this value')
 cmd:option('-train_frac',0.95,'fraction of data that goes into train set')
 cmd:option('-val_frac',0.05,'fraction of data that goes into validation set')
@@ -69,7 +69,7 @@ opt = cmd:parse(arg)
 torch.manualSeed(opt.seed)
 -- train / val / test split for data, in fractions
 local test_frac = math.max(0, 1 - (opt.train_frac + opt.val_frac))
-local split_sizes = {opt.train_frac, opt.val_frac, test_frac} 
+local split_sizes = {opt.train_frac, opt.val_frac, test_frac}
 
 -- initialize cunn/cutorch for training on the GPU and fall back to CPU gracefully
 if opt.gpuid >= 0 and opt.opencl == 0 then
@@ -108,10 +108,10 @@ if opt.gpuid >= 0 and opt.opencl == 1 then
 end
 
 -- create the data loader class
-local loader = CharSplitLMMinibatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, split_sizes)
-local vocab_size = loader.vocab_size  -- the number of distinct characters
-local vocab = loader.vocab_mapping
-print('vocab size: ' .. vocab_size)
+--*mark* local loader = CharSplitLMMinibatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, split_sizes)
+local feature_num = loader.col_num  -- the number of distinct characters
+--*delete* local vocab = loader.vocab_mapping
+print('Feature Number: ' .. feature_num)
 -- make sure output directory exists
 if not path.exists(opt.checkpoint_dir) then lfs.mkdir(opt.checkpoint_dir) end
 
@@ -122,13 +122,15 @@ if string.len(opt.init_from) > 0 then
     local checkpoint = torch.load(opt.init_from)
     protos = checkpoint.protos
     -- make sure the vocabs are the same
+    --[[*delete*
     local vocab_compatible = true
-    for c,i in pairs(checkpoint.vocab) do 
-        if not vocab[c] == i then 
+    for c,i in pairs(checkpoint.vocab) do
+        if not vocab[c] == i then
             vocab_compatible = false
         end
     end
     assert(vocab_compatible, 'error, the character vocabulary for this dataset and the one in the saved checkpoint are not the same. This is trouble.')
+    --]]
     -- overwrite model settings based on checkpoint to ensure compatibility
     print('overwriting rnn_size=' .. checkpoint.opt.rnn_size .. ', num_layers=' .. checkpoint.opt.num_layers .. ' based on the checkpoint.')
     opt.rnn_size = checkpoint.opt.rnn_size
@@ -138,13 +140,15 @@ else
     print('creating an ' .. opt.model .. ' with ' .. opt.num_layers .. ' layers')
     protos = {}
     if opt.model == 'lstm' then
-        protos.rnn = LSTM.lstm(vocab_size, opt.rnn_size, opt.num_layers, opt.dropout)
+        protos.rnn = LSTM.lstm(feature_num, opt.rnn_size, opt.num_layers, opt.dropout)
     elseif opt.model == 'gru' then
-        protos.rnn = GRU.gru(vocab_size, opt.rnn_size, opt.num_layers, opt.dropout)
+        protos.rnn = GRU.gru(feature_num, opt.rnn_size, opt.num_layers, opt.dropout)
     elseif opt.model == 'rnn' then
-        protos.rnn = RNN.rnn(vocab_size, opt.rnn_size, opt.num_layers, opt.dropout)
+        protos.rnn = RNN.rnn(feature_num, opt.rnn_size, opt.num_layers, opt.dropout)
     end
-    protos.criterion = nn.ClassNLLCriterion()
+    --*delete* protos.criterion = nn.ClassNLLCriterion()
+    protos.criterion = nn.MSECriterion()
+
 end
 
 -- the initial state of the cell/hidden states
@@ -195,6 +199,7 @@ for name,proto in pairs(protos) do
     clones[name] = model_utils.clone_many_times(proto, opt.seq_length, not proto.parameters)
 end
 
+--[[ *delete*
 -- preprocessing helper function
 function prepro(x,y)
     x = x:transpose(1,2):contiguous() -- swap the axes for faster indexing
@@ -210,28 +215,32 @@ function prepro(x,y)
     end
     return x,y
 end
+--]]
 
 -- evaluate the loss over an entire split
 function eval_split(split_index, max_batches)
     print('evaluating loss over split index ' .. split_index)
+    --*todo*
     local n = loader.split_sizes[split_index]
     if max_batches ~= nil then n = math.min(max_batches, n) end
 
+    --*todo*
     loader:reset_batch_pointer(split_index) -- move batch iteration pointer for this split to front
     local loss = 0
     local rnn_state = {[0] = init_state}
-    
+
     for i = 1,n do -- iterate over batches in the split
         -- fetch a batch
+        --*todo*
         local x, y = loader:next_batch(split_index)
-        x,y = prepro(x,y)
+        --*delte* x,y = prepro(x,y)
         -- forward pass
         for t=1,opt.seq_length do
             clones.rnn[t]:evaluate() -- for dropout proper functioning
             local lst = clones.rnn[t]:forward{x[t], unpack(rnn_state[t-1])}
             rnn_state[t] = {}
             for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end
-            prediction = lst[#lst] 
+            prediction = lst[#lst]
             loss = loss + clones.criterion[t]:forward(prediction, y[t])
         end
         -- carry over lstm state
@@ -252,8 +261,9 @@ function feval(x)
     grad_params:zero()
 
     ------------------ get minibatch -------------------
+    --*todo*
     local x, y = loader:next_batch(1)
-    x,y = prepro(x,y)
+    --*delete* x,y = prepro(x,y)
     ------------------- forward pass -------------------
     local rnn_state = {[0] = init_state_global}
     local predictions = {}           -- softmax outputs
@@ -278,7 +288,7 @@ function feval(x)
         drnn_state[t-1] = {}
         for k,v in pairs(dlst) do
             if k > 1 then -- k == 1 is gradient on x, which we dont need
-                -- note we do k-1 because first item is dembeddings, and then follow the 
+                -- note we do k-1 because first item is dembeddings, and then follow the
                 -- derivatives of the state, starting at index 2. I know...
                 drnn_state[t-1][k-1] = v
             end
@@ -314,7 +324,7 @@ for i = 1, iterations do
         cutorch.synchronize()
     end
     local time = timer:time().real
-    
+
     local train_loss = loss[1] -- the loss is inside a list, pop it
     train_losses[i] = train_loss
 
@@ -343,14 +353,14 @@ for i = 1, iterations do
         checkpoint.val_losses = val_losses
         checkpoint.i = i
         checkpoint.epoch = epoch
-        checkpoint.vocab = loader.vocab_mapping
+        --*delete* checkpoint.vocab = loader.vocab_mapping
         torch.save(savefile, checkpoint)
     end
 
     if i % opt.print_every == 0 then
         print(string.format("%d/%d (epoch %.3f), train_loss = %6.8f, grad/param norm = %6.4e, time/batch = %.4fs", i, iterations, epoch, train_loss, grad_params:norm() / params:norm(), time))
     end
-   
+
     if i % 10 == 0 then collectgarbage() end
 
     -- handle early stopping if things are going really bad
