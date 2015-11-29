@@ -6,8 +6,11 @@ function StockDataLoader.create(csv_dir, row_num, col_num)
     setmetatable(self, StockDataLoader)
     self.row_num = row_num
     self.col_num = col_num
-    self.stock_data = StockDataLoader.read_csv(csv_dir, 'AAPL_10years_HistoricalQuotes.csv', row_num, col_num)
-    self.spx_data = StockDataLoader.read_csv(csv_dir, 'SPX_10years_HistoricalQuotes.csv', row_num, col_num)
+    local raw_stock_data = StockDataLoader.read_csv(csv_dir, 'AAPL_10years_HistoricalQuotes.csv', row_num, col_num)
+    local raw_spx_data = StockDataLoader.read_csv(csv_dir, 'SPX_10years_HistoricalQuotes.csv', row_num, col_num)
+
+    self.stock_data = StockDataLoader.reverse(raw_stock_data)
+    self.spx_data   = StockDataLoader.reverse(raw_spx_data)
 
     torch.save(csv_dir..'aapl.dat', self.stock_data, 'ascii')
     torch.save(csv_dir..'spx.dat',  self.spx_data, 'ascii')
@@ -35,6 +38,18 @@ function StockDataLoader.read_csv(csv_dir, csv_file, row_num, col_num)
     end
     infile:close()
     return data
+end
+
+function StockDataLoader.reverse(data)
+    local row_num = data:size(1)
+    local col_num = data:size(2)
+    local res_data = torch.Tensor(row_num, col_num)
+    for i=1, row_num do
+        for j=1, col_num do
+            res_data[i][j] = data[row_num+1-i][j]
+        end
+    end
+    return res_data
 end
 
 function StockDataLoader:create_feature(max_sma_period, seq_length, split_fractions)
@@ -156,7 +171,6 @@ function StockDataLoader:sma(period)
     for i=(period+1), self.row_num do
         tmp1 = avg * multiplier
         tmp2 = avgsq * multiplier
-        --print('****', tmp2, tmp1)
         tmp2 = math.sqrt(tmp2 - tmp1 * tmp1)
         sma_data[i-period][1] = tmp1
         sma_data[i-period][2] = tmp1 - 2.0 * tmp2
