@@ -121,6 +121,10 @@ function StockDataLoader:create_feature(max_sma_period, seq_length, split_fracti
         self.ntrain, self.nval, self.ntest))
 end
 
+function StockDataLoader:reset_batch_pointer(split_index, feed_index)
+    feed_index = feed_index or 0
+    self.feed_ix[split_index] = feed_index
+end
 
 function StockDataLoader:next_batch(split_index)
     if self.split_sizes[split_index] == 0 then

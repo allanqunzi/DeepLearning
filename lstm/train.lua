@@ -21,7 +21,8 @@ require 'lfs'
 
 require 'util.OneHot'
 require 'util.misc'
-local CharSplitLMMinibatchLoader = require 'util.CharSplitLMMinibatchLoader'
+--local CharSplitLMMinibatchLoader = require 'util.CharSplitLMMinibatchLoader'
+local StockDataLoader = require 'util.StockDataLoader'
 local model_utils = require 'util.model_utils'
 local LSTM = require 'model.LSTM'
 local GRU = require 'model.GRU'
@@ -45,6 +46,9 @@ cmd:option('-learning_rate_decay_after',10,'in number of epochs, when to start d
 cmd:option('-decay_rate',0.95,'decay rate for rmsprop')
 cmd:option('-dropout',0,'dropout for regularization, used after each RNN hidden layer. 0 = no dropout')
 cmd:option('-seq_length', 100,'number of timesteps to unroll for')
+cmd:option('-row_num', 2517,'number of rows used in stock data')
+cmd:option('-col_num', 5,'number of columns used in stock data')
+cmd:option('-max_sma_period', 30,'the maximum period for simple moving average')
 cmd:option('-batch_size', 1,'number of sequences to train on in parallel')
 cmd:option('-max_epochs', 100,'number of full passes through the training data')
 cmd:option('-grad_clip',5,'clip gradients at this value')
@@ -109,7 +113,9 @@ end
 
 -- create the data loader class
 --*mark* local loader = CharSplitLMMinibatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, split_sizes)
-local feature_num = loader.col_num  -- the number of distinct characters
+loader = StockDataLoader.create('/home/qunzi/DeepLearning/lstm/data/aapl_spx/', opt.row_num, opt.col_num)
+loader:create_feature(opt.max_sma_period, opt.seq_length, split_sizes)
+local feature_num = loader.feature_num  -- the number of distinct characters
 --*delete* local vocab = loader.vocab_mapping
 print('Feature Number: ' .. feature_num)
 -- make sure output directory exists
@@ -220,18 +226,15 @@ end
 -- evaluate the loss over an entire split
 function eval_split(split_index, max_batches)
     print('evaluating loss over split index ' .. split_index)
-    --*todo*
     local n = loader.split_sizes[split_index]
     if max_batches ~= nil then n = math.min(max_batches, n) end
 
-    --*todo*
     loader:reset_batch_pointer(split_index) -- move batch iteration pointer for this split to front
     local loss = 0
     local rnn_state = {[0] = init_state}
 
     for i = 1,n do -- iterate over batches in the split
         -- fetch a batch
-        --*todo*
         local x, y = loader:next_batch(split_index)
         --*delte* x,y = prepro(x,y)
         -- forward pass
@@ -261,7 +264,6 @@ function feval(x)
     grad_params:zero()
 
     ------------------ get minibatch -------------------
-    --*todo*
     local x, y = loader:next_batch(1)
     --*delete* x,y = prepro(x,y)
     ------------------- forward pass -------------------
