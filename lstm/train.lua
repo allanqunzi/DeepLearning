@@ -112,7 +112,6 @@ if opt.gpuid >= 0 and opt.opencl == 1 then
 end
 
 -- create the data loader class
---*mark* local loader = CharSplitLMMinibatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, split_sizes)
 loader = StockDataLoader.create('/home/qunzi/DeepLearning/lstm/data/aapl_spx/', opt.row_num, opt.col_num)
 loader:create_feature(opt.max_sma_period, opt.seq_length, split_sizes)
 local feature_num = loader.feature_num  -- the number of distinct characters

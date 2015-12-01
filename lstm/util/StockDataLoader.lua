@@ -9,6 +9,9 @@ function StockDataLoader.create(csv_dir, row_num, col_num)
     local raw_stock_data = StockDataLoader.read_csv(csv_dir, 'AAPL_10years_HistoricalQuotes.csv', row_num, col_num)
     local raw_spx_data = StockDataLoader.read_csv(csv_dir, 'SPX_10years_HistoricalQuotes.csv', row_num, col_num)
 
+    raw_stock_data = StockDataLoader.subtract_mean(raw_stock_data)
+    raw_spx_data   = StockDataLoader.subtract_mean(raw_spx_data)
+
     self.stock_data = StockDataLoader.reverse(raw_stock_data)
     self.spx_data   = StockDataLoader.reverse(raw_spx_data)
 
@@ -52,6 +55,17 @@ function StockDataLoader.reverse(data)
     return res_data
 end
 
+function StockDataLoader.subtract_mean(data)
+    local row_num = data:size(1)
+    local col_num = data:size(2)
+    local mean = torch.mean(data, 1)
+    for i=1, col_num do
+        local selected = data:select(2, i)
+        selected = selected - torch.Tensor(row_num):fill(mean[1][i])
+    end
+    return data
+end
+
 function StockDataLoader:create_feature(max_sma_period, seq_length, split_fractions)
     -- split_fractions is e.g. {0.9, 0.05, 0.05}
 
@@ -59,7 +73,7 @@ function StockDataLoader:create_feature(max_sma_period, seq_length, split_fracti
     assert(self.stock_data:size(1) == self.row_num)
     assert(self.stock_data:size(1) == self.spx_data:size(1))
     self.feature_data = torch.cat(
-        self.stock_data:index(2, torch.LongTensor{1,3,4,5}),
+        self.stock_data:index(2, torch.LongTensor{1}),
         self.spx_data:index(2, torch.LongTensor{1}),
         2)
 
