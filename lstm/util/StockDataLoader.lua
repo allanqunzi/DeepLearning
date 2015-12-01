@@ -15,8 +15,8 @@ function StockDataLoader.create(csv_dir, row_num, col_num)
     self.stock_data = StockDataLoader.reverse(raw_stock_data)
     self.spx_data   = StockDataLoader.reverse(raw_spx_data)
 
-    torch.save(csv_dir..'aapl.dat', self.stock_data, 'ascii')
-    torch.save(csv_dir..'spx.dat',  self.spx_data, 'ascii')
+    --torch.save(csv_dir..'aapl.dat', self.stock_data, 'ascii')
+    --torch.save(csv_dir..'spx.dat',  self.spx_data, 'ascii')
     return self
 end
 
@@ -60,8 +60,7 @@ function StockDataLoader.subtract_mean(data)
     local col_num = data:size(2)
     local mean = torch.mean(data, 1)
     for i=1, col_num do
-        local selected = data:select(2, i)
-        selected = selected - torch.Tensor(row_num):fill(mean[1][i])
+        data[{ {}, i }] = data[{ {}, i }] - torch.Tensor(row_num):fill(mean[1][i])
     end
     return data
 end
@@ -96,7 +95,7 @@ function StockDataLoader:create_feature(max_sma_period, seq_length, split_fracti
     local tmp_len = self.row_num - max_sma_period
     if tmp_len % seq_length ~= 0 then
         print('cutting off end of data so that the sequences divide evenly')
-        self.feature_data = self.feature_data:sub(max_sma_period+1, seq_length*math.floor(tmp_len/seq_length))
+        self.feature_data = self.feature_data:sub(max_sma_period+1, max_sma_period+seq_length*math.floor(tmp_len/seq_length))
     end
     self.data_len = self.feature_data:size(1)
     self.feature_num = self.feature_data:size(2)
