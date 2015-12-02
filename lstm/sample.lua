@@ -3,7 +3,7 @@
 
 This file samples characters from a trained model
 
-Code is based on implementation in 
+Code is based on implementation in
 https://github.com/oxford-cs-ml-2015/practical6
 
 ]]--
@@ -33,15 +33,28 @@ cmd:option('-temperature',1,'temperature of sampling')
 cmd:option('-gpuid',0,'which gpu to use. -1 = use CPU')
 cmd:option('-opencl',0,'use OpenCL (instead of CUDA)')
 cmd:option('-verbose',1,'set to 0 to ONLY print the sampled text, no diagnostics')
+cmd:option('-seq_length', 100,'number of timesteps to unroll for')
+cmd:option('-row_num', 2517,'number of rows used in stock data')
+cmd:option('-col_num', 5,'number of columns used in stock data')
+cmd:option('-max_sma_period', 30,'the maximum period for simple moving average')
+cmd:option('-train_frac',0.85,'fraction of data that goes into train set')
+cmd:option('-val_frac',0.05,'fraction of data that goes into validation set')
 cmd:text()
 
 -- parse input params
 opt = cmd:parse(arg)
 
+-- train / val / test split for data, in fractions
+local test_frac = math.max(0, 1 - (opt.train_frac + opt.val_frac))
+local split_sizes = {opt.train_frac, opt.val_frac, test_frac}
+
 -- gated print: simple utility function wrapping a print
 function gprint(str)
     if opt.verbose == 1 then print(str) end
 end
+
+loader = StockDataLoader.create('/home/qunzi/DeepLearning/lstm/data/aapl_spx/', opt.row_num, opt.col_num)
+loader:create_feature(opt.max_sma_period, opt.seq_length, split_sizes)
 
 -- check that cunn/cutorch are installed if user wants to use the GPU
 if opt.gpuid >= 0 and opt.opencl == 0 then
@@ -87,10 +100,12 @@ checkpoint = torch.load(opt.model)
 protos = checkpoint.protos
 protos.rnn:evaluate() -- put in eval mode so that dropout works properly
 
+--[[*delete*
 -- initialize the vocabulary (and its inverted version)
 local vocab = checkpoint.vocab
 local ivocab = {}
 for c,i in pairs(vocab) do ivocab[i] = c end
+--]]
 
 -- initialize the rnn state to all zeros
 gprint('creating an ' .. checkpoint.opt.model .. '...')
@@ -108,6 +123,17 @@ for L = 1,checkpoint.opt.num_layers do
 end
 state_size = #current_state
 
+for i=1, loader.split_sizes[3] do
+    local x, y = loader:next_batch(split_index)
+    for t=1, opt.seq_length do
+        local lst = protos.rnn:forward{x[t], unpack(current_state)}
+        current_state = {}
+        for k=1,state_size do table.insert(current_state, lst[k]) end
+        prediction = lst[#lst]
+    end
+end
+
+--[[*delete*
 -- do a few seeded timesteps
 local seed_text = opt.primetext
 if string.len(seed_text) > 0 then
@@ -115,7 +141,7 @@ if string.len(seed_text) > 0 then
     gprint('--------------------------')
     for c in seed_text:gmatch'.' do
         prev_char = torch.Tensor{vocab[c]}
-        io.write(ivocab[prev_char[1]])
+        io.write(ivocab[prev_char[1] ])
         if opt.gpuid >= 0 and opt.opencl == 0 then prev_char = prev_char:cuda() end
         if opt.gpuid >= 0 and opt.opencl == 1 then prev_char = prev_char:cl() end
         local lst = protos.rnn:forward{prev_char, unpack(current_state)}
@@ -132,7 +158,9 @@ else
     if opt.gpuid >= 0 and opt.opencl == 0 then prediction = prediction:cuda() end
     if opt.gpuid >= 0 and opt.opencl == 1 then prediction = prediction:cl() end
 end
+--]]
 
+--[[*delete*
 -- start sampling/argmaxing
 for i=1, opt.length do
 
@@ -155,7 +183,9 @@ for i=1, opt.length do
     for i=1,state_size do table.insert(current_state, lst[i]) end
     prediction = lst[#lst] -- last element holds the log probabilities
 
-    io.write(ivocab[prev_char[1]])
+    io.write(ivocab[prev_char[1] ])
 end
+
 io.write('\n') io.flush()
+--]]
 

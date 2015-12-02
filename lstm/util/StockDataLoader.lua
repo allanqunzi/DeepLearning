@@ -15,8 +15,12 @@ function StockDataLoader.create(csv_dir, row_num, col_num)
     self.stock_data = StockDataLoader.reverse(raw_stock_data)
     self.spx_data   = StockDataLoader.reverse(raw_spx_data)
 
-    --torch.save(csv_dir..'aapl.dat', self.stock_data, 'ascii')
-    --torch.save(csv_dir..'spx.dat',  self.spx_data, 'ascii')
+    local stock_file = csv_dir..'aapl.dat'
+    local spx_file   = csv_dir..'spx.dat'
+    if not (path.exists(stock_file) and path.exists(spx_file)) then
+        torch.save(, self.stock_data, 'ascii')
+        torch.save(csv_dir..'spx.dat',  self.spx_data, 'ascii')
+    end
     return self
 end
 
