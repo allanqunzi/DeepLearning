@@ -17,6 +17,7 @@ require 'lfs'
 require 'util.OneHot'
 require 'util.misc'
 
+local StockDataLoader = require 'util.StockDataLoader'
 cmd = torch.CmdLine()
 cmd:text()
 cmd:text('Sample from a character-level language model')
@@ -124,12 +125,13 @@ end
 state_size = #current_state
 
 for i=1, loader.split_sizes[3] do
-    local x, y = loader:next_batch(split_index)
+    local x, y = loader:next_batch(3)
     for t=1, opt.seq_length do
         local lst = protos.rnn:forward{x[t], unpack(current_state)}
         current_state = {}
         for k=1,state_size do table.insert(current_state, lst[k]) end
         prediction = lst[#lst]
+        print(y[t][1] .. ' = '..prediction[1])
     end
 end
 
